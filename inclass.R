@@ -114,15 +114,17 @@ x = X$price
 # and see if there are any ARCH effects
 par(mfrow = c(1, 2))
 plot.ts(x)
-lr = diff(log(x)) # log returns
+lr = diff(log(x)) * 100 # log returns (%)
 plot.ts(lr)
 
+# ACF of log returns and squared log returns
 acf(lr)
 acf(lr^2)
 
-m_lr = auto.arima(lr, allowmean = FALSE)
-m_lr
-lr_resid <- m_lr$residuals
+# Model autocorrelations before modeling any ARCH effects
+m_arma = auto.arima(lr, allowmean = FALSE)
+m_arma
+lr_resid <- m_arma$residuals
 # detect ARCH effects visually
 acf(lr_resid)
 acf(lr_resid^2)
@@ -130,12 +132,22 @@ acf(lr_resid^2)
 # test for ARCH effects
 FinTS::ArchTest(lr_resid, lags = 10)
 
-# Model
+# Model using fGarch (NAs in the output) 
 library(fGarch)
-m = fGarch::garchFit(formula = ~ arma(0, 1) + garch(1, 1),
+set.seed(123)
+m_garch = fGarch::garchFit(formula = ~arma(0, 1) + garch(1, 1),
                      algorithm = "lbfgsb",
                      data = lr)
-plot(m)
-predict()
-, which = c(3, 13))
-plot(m, which = c(9, 11))
+m_garch
+par(mfrow = c(1, 2))
+fGarch::plot(m, which = c(9, 11))
+
+
+# Model using rugarch
+library(rugarch)
+spec = ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                   mean.model = list(armaOrder = c(0, 1), include.mean = FALSE))
+m_rugarch = ugarchfit(spec, data = lr)
+m_rugarch
+rugarch::plot(m_rugarch, which = 9)
+rugarch::plot(m_rugarch, which = 11)
